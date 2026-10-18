@@ -5,61 +5,74 @@ import zipfile
 # Configuración de la página
 st.set_page_config(page_title="Buscador - Gobierno de Dios", page_icon="🛡️", layout="wide")
 
-# --- ESTILOS CSS INSTITUCIONALES ---
+# --- ESTILOS CSS MODO OSCURO INSTITUCIONAL ---
 st.markdown("""
 <style>
-    /* Fondo sutil y elegante */
+    /* Fondo oscuro elegante y descansado para la vista */
     .stApp {
-        background-color: #f4f6f9;
+        background-color: #051024;
     }
-    /* Títulos en Azul Marino */
+    /* Color del texto general */
+    .stMarkdown, p {
+        color: #E2E8F0;
+    }
+    /* Títulos en Dorado */
     h1, h2, h3 {
-        color: #0B1C4A !important;
+        color: #D4AF37 !important;
         font-family: 'Times New Roman', Times, serif;
         text-align: center;
     }
-    /* Subtítulos Dorados */
+    /* Subtítulos */
     .subtitulo {
-        color: #B8860B;
+        color: #E2C275;
         text-align: center;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         font-weight: bold;
         margin-bottom: 2rem;
-        letter-spacing: 1px;
+        letter-spacing: 2px;
     }
-    /* Bordes dorados en la caja de búsqueda */
+    /* Caja de búsqueda */
     .stTextInput>div>div>input {
-        border: 2px solid #B8860B;
+        background-color: #0A1931;
+        color: #FFFFFF;
+        border: 2px solid #D4AF37;
         border-radius: 8px;
-        padding: 10px;
+        padding: 12px;
         font-size: 1.1rem;
     }
     .stTextInput>div>div>input:focus {
-        border-color: #0B1C4A;
-        box-shadow: 0 0 5px rgba(11, 28, 74, 0.5);
+        border-color: #E2C275;
+        box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
     }
-    /* Diseño de los mensajes de alerta */
-    .stAlert {
-        border-left: 5px solid #B8860B;
-    }
-    /* Tarjetas de resultados */
-    div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"] {
-        background-color: white;
-        padding: 15px;
+    /* Tarjetas de resultados limpias (HTML puro para evitar las cajas blancas) */
+    .resultado-card {
+        background-color: #0A1931;
+        padding: 15px 20px;
         border-radius: 8px;
-        border-top: 3px solid #0B1C4A;
-        border-bottom: 3px solid #B8860B;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border-left: 5px solid #D4AF37;
         margin-bottom: 15px;
+        border-right: 1px solid #1A2B4C;
+        border-top: 1px solid #1A2B4C;
+        border-bottom: 1px solid #1A2B4C;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .resultado-card a {
+        color: #4DA8DA;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .resultado-card a:hover {
+        text-decoration: underline;
+        color: #63B3ED;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # --- ENCABEZADO INSTITUCIONAL ---
-col1, col2, col3 = st.columns([1, 1, 1])
+# Ajustamos las proporciones para que el escudo quede de un tamaño perfecto y sin cajas
+col1, col2, col3 = st.columns([1.5, 1, 1.5])
 with col2:
     try:
-        # Aquí cargamos la imagen del escudo que vas a subir
         st.image("escudo.jpeg", use_container_width=True)
     except Exception:
         pass
@@ -78,21 +91,22 @@ def cargar_base_datos():
         st.error(f"Error al cargar la base de datos: {e}")
         return []
 
-with st.spinner('Cargando la base de datos global...'):
+with st.spinner('Cargando los archivos del Reino...'):
     base_de_datos = cargar_base_datos()
 
 if not base_de_datos:
     st.stop()
 
-# Interfaz de búsqueda
-st.info(f"🛡️ **Base de datos institucional activa:** {len(base_de_datos)} calqueos indexados en la red.")
+# Etiqueta de base de datos activa
+st.markdown(f"<div style='text-align: center; color: #829AB1; margin-bottom: 20px;'>🛡️ <b>Base de datos activa:</b> {len(base_de_datos)} calqueos indexados.</div>", unsafe_allow_html=True)
+
 frase_busqueda = st.text_input("", placeholder="🔍 Ingresa la palabra o frase a buscar (Ejemplo: Bendecidos entienden)")
 
 if frase_busqueda:
     frase_limpia = frase_busqueda.strip().lower()
     resultados_encontrados = []
     
-    with st.spinner('Buscando en los archivos del Reino...'):
+    with st.spinner('Buscando coincidencias...'):
         for video in base_de_datos:
             for bloque in video.get("transcripcion", []):
                 texto_original = bloque.get("text", "")
@@ -102,7 +116,6 @@ if frase_busqueda:
                     minutos = segundos_totales // 60
                     segundos = segundos_totales % 60
                     tiempo_formateado = f"{minutos}:{segundos:02d}"
-                    
                     enlace_youtube = f"https://youtu.be/{video['video_id']}?t={segundos_totales}"
                     
                     resultados_encontrados.append({
@@ -114,12 +127,17 @@ if frase_busqueda:
 
     # Mostrar Resultados
     if resultados_encontrados:
-        st.markdown(f"<h3 style='text-align: left; color: #0B1C4A;'>🔍 Se encontraron {len(resultados_encontrados)} menciones:</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='text-align: left; margin-top: 20px;'>🔍 Se encontraron {len(resultados_encontrados)} menciones:</h3>", unsafe_allow_html=True)
         
         for res in resultados_encontrados:
-            with st.container():
-                st.markdown(f"**🎥 {res['titulo']}**")
-                st.markdown(f"⏱️ **Minuto {res['tiempo']}** — *\"...{res['texto']}...\"*")
-                st.markdown(f"[▶️ Ver el video en el minuto exacto]({res['enlace']})")
+            # Ahora usamos tarjetas personalizadas que no interfieren con la estructura de Streamlit
+            st.markdown(f"""
+            <div class="resultado-card">
+                <div style="color: #D4AF37; font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">🎥 {res['titulo']}</div>
+                <div style="color: #A0AEC0; font-size: 0.9rem; margin-bottom: 8px;">⏱️ Minuto {res['tiempo']}</div>
+                <div style="color: #F0F2F6; font-size: 1.05rem; font-style: italic; margin-bottom: 10px;">"...{res['texto']}..."</div>
+                <a href="{res['enlace']}" target="_blank">▶️ Ver en YouTube en este minuto exacto</a>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         st.warning("No se encontraron coincidencias para esa frase. Intenta buscar una palabra más corta o sin tildes.")
