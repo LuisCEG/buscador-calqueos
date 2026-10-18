@@ -1,66 +1,72 @@
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
-import urllib.parse as urlparse
+import json
+import zipfile
 
 # Configuración de la página
-st.set_page_config(page_title="Buscador de Calqueos", page_icon="📖", layout="centered")
+st.set_page_config(page_title="Buscador de Calqueos", page_icon="📖", layout="wide")
 
-st.title("📖 Buscador Interactivo de Calqueos")
-st.markdown("Encuentra frases exactas en tus predicaciones y salta al minuto correcto con un clic.")
+st.title("📖 Buscador Global de Calqueos")
+st.markdown("Encuentra frases exactas en los 740 videos de **CRECIENDO EN GRACIA** al instante.")
 
-# Función para limpiar y extraer el ID del video
-def extraer_video_id(url):
-    if "youtube.com" in url or "youtu.be" in url:
-        if "youtu.be" in url:
-            return url.split("/")[-1].split("?")[0]
-        else:
-            parsed = urlparse.urlparse(url)
-            return urlparse.parse_qs(parsed.query).get("v", [url])[0]
-    return url # Asume que ya es un ID si no hay URL
-
-# Entrada de datos
-video_input = st.text_input("🔗 Pega el enlace de YouTube o el ID del video:", placeholder="Ej: https://youtu.be/Jz6oTk7XEn0")
-
-if video_input:
-    video_id = extraer_video_id(video_input)
-    
+# Función para cargar la base de datos desde el ZIP de forma optimizada
+@st.cache_data(show_spinner=False)
+def cargar_base_datos():
     try:
-        # Extraer la transcripción
-        with st.spinner("Extrayendo texto del video..."):
-            transcripcion = YouTubeTranscriptApi.get_transcript(video_id, languages=['es', 'en'])
-            
-        st.success("✅ Texto extraído correctamente.")
-        
-        # Buscador de palabras
-        busqueda = st.text_input("🔍 Escribe la palabra o frase que deseas buscar en este video:")
-        
-        st.markdown("---")
-        st.markdown("### 📝 Transcripción Interactiva")
-        
-        resultados_encontrados = 0
-        
-        # Iterar sobre cada línea de la transcripción
-        for fragmento in transcripcion:
-            texto = fragmento['text']
-            
-            # Filtro de búsqueda (si está vacío, muestra todo)
-            if busqueda.lower() in texto.lower():
-                resultados_encontrados += 1
-                
-                # Formatear el tiempo a [MM:SS]
-                inicio_segundos = int(fragmento['start'])
-                minutos = inicio_segundos // 60
-                segundos = inicio_segundos % 60
-                tiempo_formateado = f"[{minutos:02d}:{segundos:02d}]"
-                
-                # Construir enlace directo al segundo exacto
-                enlace_youtube = f"https://youtu.be/{video_id}?t={inicio_segundos}"
-                
-                # Mostrar en pantalla
-                st.markdown(f"**{tiempo_formateado}** - [{texto}]({enlace_youtube})")
-                
-        if resultados_encontrados == 0:
-            st.warning("No se encontraron resultados para esa búsqueda. Intenta con otra palabra.")
-
+        # Aquí es donde abrimos tu archivo comprimido
+        with zipfile.ZipFile('bd_calqueos.zip', 'r') as z:
+            with z.open('bd_calqueos.json') as f:
+                return json.load(f)
     except Exception as e:
-        st.error(f"❌ Error al cargar el video. Verifica el enlace o asegúrate de que tenga transcripción habilitada. Detalle: {e}")
+        st.error(f"Error al cargar la base de datos: {e}")
+        return []
+
+with st.spinner('Cargando la base de datos global...'):
+    base_de_datos = cargar_base_datos()
+
+if not base_de_datos:
+    st.stop()
+
+# Interfaz de búsqueda
+st.success(f"✅ Base de datos lista: {len(base_de_datos)} videos cargados.")
+frase_busqueda = st.text_input("Ingresa la palabra o frase a buscar:", placeholder="Ejemplo: Bendecidos entien y no entienden")
+
+if frase_busqueda:
+    frase_limpia = frase_busqueda.strip().lower()
+    resultados_encontrados = []
+    
+    with st.spinner('Buscando en todos los videos...'):
+        # Recorremos los videos en memoria
+        for video in base_de_datos:
+            for bloque in video.get("transcripcion", []):
+                texto_original = bloque.get("text", "")
+                
+                # Búsqueda ignorando mayúsculas y minúsculas
+                if frase_limpia in texto_original.lower():
+                    # Formatear el tiempo a minutos y segundos
+                    segundos_totales = int(bloque.get("start", 0))
+                    minutos = segundos_totales // 60
+                    segundos = segundos_totales % 60
+                    tiempo_formateado = f"{minutos}:{segundos:02d}"
+                    
+                    # Crear el enlace de YouTube al minuto exacto
+                    enlace_youtube = f"https://youtu.be/{video['video_id']}?t={segundos_totales}"
+                    
+                    resultados_encontrados.append({
+                        "titulo": video["titulo"],
+                        "texto": texto_original,
+                        "tiempo": tiempo_formateado,
+                        "enlace": enlace_youtube
+                    })
+
+    # Mostrar Resultados
+    if resultados_encontrados:
+        st.subheader(f"🔍 Se encontraron {len(resultados_encontrados)} menciones:")
+        
+        for res in resultados_encontrados:
+            with st.container():
+                st.markdown(f"**🎥 {res['titulo']}**")
+                st.markdown(f"⏱️ **Minuto {res['tiempo']}** — *\"...{res['texto']}...\"*")
+                st.markdown(f"[▶️ Clic aquí para ver el video en este minuto exacto]({res['enlace']})")
+                st.divider()
+    else:
+        st.warning("No se encontraron coincidencias para esa frase. Intenta buscar una palabra más corta.")
